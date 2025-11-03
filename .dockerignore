@@ -1,0 +1,21 @@
+# Node / tooling
+node_modules
+.pnpm-store
+npm-debug.log
+pnpm-debug.log
+coverage
+dist
+
+# VCS & editor
+.git
+.gitignore
+.husky
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env

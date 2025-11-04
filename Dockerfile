@@ -7,7 +7,8 @@ ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
-
+# Install OpenSSL for Prisma during build
+RUN apk add --no-cache openssl
 # Install deps (cache layer)
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -26,6 +27,8 @@ WORKDIR /app
 
 # Non-root (Node image already has user 'node')
 USER node
+# Install OpenSSL for Prisma during build
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 ENV PORT=3000

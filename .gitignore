@@ -113,3 +113,5 @@ coverage-final.json
 
 # TernJS
 .tern-port
+
+/src/generated/prisma

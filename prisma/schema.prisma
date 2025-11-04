@@ -1,0 +1,54 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Link {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  targetUrl   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  title       String?
+  enabled     Boolean          @default(true)
+  totalClicks Int              @default(0)
+  ownerId     String?
+  clicks      ClickEvent[]
+  aggregates  DailyAggregate[]
+}
+
+model ClickEvent {
+  id        String   @id @default(cuid())
+  linkId    String
+  ts        DateTime @default(now())
+  ipHash    String?
+  userAgent String?
+  referer   String?
+  country   String?
+  Link      Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, ts])
+}
+
+model DailyAggregate {
+  id      String   @id @default(cuid())
+  linkId  String
+  date    DateTime
+  clicks  Int      @default(0)
+  country String?
+  referer String?
+  Link    Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, date, country, referer])
+  @@index([linkId, date])
+}

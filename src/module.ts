@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 
+import { LinkModule } from './link/link.module';
 import { HealthController } from './routes/health.controller';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -18,6 +19,7 @@ const isProd = process.env.NODE_ENV === 'production';
             },
           },
     }),
+    LinkModule,
   ],
   controllers: [HealthController],
 })

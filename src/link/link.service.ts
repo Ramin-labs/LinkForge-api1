@@ -1,14 +1,20 @@
 import { randomBytes } from 'crypto';
 
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
 
+import { CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateLinkDto } from './dto/create-link.dto';
 
+const CODE_CACHE_TTL_SEC = 60 * 60 * 24; // 24h
+
 @Injectable()
 export class LinkService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CacheService) private readonly cache: CacheService,
+  ) {}
 
   // Unambiguous, human-friendly alphabet (no 0, O, I, l, 1)
   private readonly CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -57,5 +63,92 @@ export class LinkService {
         enabled: true,
       },
     });
+  }
+
+  async listLinks() {
+    return this.prisma.link.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        targetUrl: true,
+        title: true,
+        code: true,
+        createdAt: true,
+        totalClicks: true,
+        enabled: true,
+      },
+    });
+  }
+
+  async listLinksPaginated(limit = 10, cursor?: string) {
+    const take = Math.min(Math.max(limit, 1), 50);
+
+    const items = await this.prisma.link.findMany({
+      take,
+      skip: cursor ? 1 : 0, // skip the cursor item itself
+      ...(cursor ? { cursor: { id: cursor } } : {}),
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        code: true,
+        targetUrl: true,
+        createdAt: true,
+        title: true,
+        totalClicks: true,
+        enabled: true,
+      },
+    });
+
+    let nextCursor: string | null = null;
+    if (items.length === take) {
+      const last = items[items.length - 1];
+      if (last) nextCursor = last.id;
+    }
+
+    return { items, nextCursor };
+  }
+
+  async getByCode(code: string) {
+    const link = await this.prisma.link.findUnique({
+      where: {
+        code,
+      },
+      select: {
+        id: true,
+        targetUrl: true,
+        title: true,
+        code: true,
+        createdAt: true,
+        totalClicks: true,
+        enabled: true,
+      },
+    });
+    if (!link) throw new BadRequestException('Link not found');
+    return link;
+  }
+
+  private cacheKeyFor(code: string) {
+    return `lf:code:${code}`;
+  }
+
+  async getTargetUrlByCodeFast(code: string): Promise<string> {
+    // 1) Cache first
+    const key = this.cacheKeyFor(code);
+    const cached = await this.cache.get(key);
+    if (cached) return cached;
+
+    // 2) DB fallback
+    const link = await this.prisma.link.findUnique({
+      where: { code },
+      select: { targetUrl: true, enabled: true },
+    });
+
+    if (!link || !link.enabled) {
+      throw new NotFoundException('Link not found');
+    }
+
+    // 3) Fill cache
+    await this.cache.set(key, link.targetUrl, CODE_CACHE_TTL_SEC);
+    return link.targetUrl;
   }
 }

@@ -13,6 +13,10 @@ RUN apk add --no-cache openssl
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# Generate Prisma client before building
+COPY prisma ./prisma
+RUN pnpm prisma generate
+
 # Copy source and build
 COPY tsconfig.json ./
 COPY src ./src

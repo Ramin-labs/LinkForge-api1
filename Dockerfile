@@ -13,6 +13,10 @@ RUN apk add --no-cache openssl
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# Generate Prisma client before building
+COPY prisma ./prisma
+RUN pnpm prisma generate
+
 # Copy source and build
 COPY tsconfig.json ./
 COPY src ./src
@@ -25,10 +29,10 @@ RUN pnpm prune --prod --ignore-scripts
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
-# Non-root (Node image already has user 'node')
-USER node
-# Install OpenSSL for Prisma during build
+# Install OpenSSL for Prisma at runtime (requires root)
 RUN apk add --no-cache openssl
+# Switch to non-root user (Node image already has user 'node')
+USER node
 
 ENV NODE_ENV=production
 ENV PORT=3000
